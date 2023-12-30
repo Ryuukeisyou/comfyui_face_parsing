@@ -7,7 +7,10 @@ There are also auxiliary nodes for image and mask processing. A guided filter is
 # Installation
 Just clone the repo https://github.com/Ryuukeisyou/comfyui_face_parsing.git into ComfyUI's "custom_nodes" directory.
 
-On first run, some required files will be downloaded to ComfyUI's "models/face_parsing/" folder. If you have difficulty connecting to [Huggingface](https://huggingface.co/), you can try mannually download the .json and .safetensors files from the [face parsing model](https://huggingface.co/jonathandinu/face-parsing) repo and save them to the "models/face_parsing/" folder.
+On first run, some required files will be downloaded to ComfyUI's "models/face_parsing/" folder and "models/ultralytics/bbox" folder. If you have difficulty connecting to [Huggingface](https://huggingface.co/), you can try mannually:
+
+1. Download the .json and .safetensors files from the [face parsing model](https://huggingface.co/jonathandinu/face-parsing) repo and save them to the "models/face_parsing/" folder.
+2. Download the face_yolov8m.pt from the [Bingsu/adetailer](https://huggingface.co/Bingsu/adetailer/) repo and save it to "models/ultralytics/bbox" folder.
 
 # Requirements
 See requirements.txt. Specially, opencv-contrib-python is needed for guided filter. If you have other versions of opencv e.g. opencv-python-headless installed after open-contrib-python, you may need to uninstall opencv-contrib-python and reinstall it again.
