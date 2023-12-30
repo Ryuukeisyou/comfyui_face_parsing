@@ -4,8 +4,10 @@ The nodes utilize the [face parsing model](https://huggingface.co/jonathandinu/f
 
 # Workflow
 a demo work flow is shown below.
+
 <img src="demo/workflow.png">
 
+<table>
 <tr>
 <th>Original</th>
 <th>Processed</th>
@@ -13,9 +15,11 @@ a demo work flow is shown below.
 
 <!-- Line 1: Compare -->
 <tr>
-<td><img src="demo/original.jpb" height="256" width="256"></td>
+<td><img src="demo/original.jpg" height="256" width="256"></td>
 <td><img src="demo/processed.png" height="256" width="256"></td>
 </tr>
+</table>
 
 This image contains the workflow which can be loaded into ComfyUI.
-<td><img src="demo/processed.png" height="256" width="256"></td>
+
+<img src="demo/processed.png" height="256" width="256">
