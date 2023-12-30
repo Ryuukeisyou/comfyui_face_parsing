@@ -553,6 +553,36 @@ class FaceParsingResultsParser:
         final = torch.cat(masks, dim=0).unsqueeze(0)
         return (final,)
 
+# class SkinDetectTraditional:
+#     def __init__(self):
+#         pass
+    
+#     @classmethod
+#     def INPUT_TYPES(cls):
+#         return {
+#             "required": {
+#                 "image": ("IMAGE",),
+#                 "mode": (["RGB", "YCrCb", "HSV"], {})
+#             }
+#         }
+ 
+#     RETURN_TYPES = ("MASK", )
+
+#     FUNCTION = "main"
+
+#     CATEGORY = "face_parsing"
+
+#     def main(self, image: Tensor, mode: str):
+#         image = image.permute(0, 3, 1, 2).squeeze(0).mul(255).byte()
+#         if (mode == 'YCrCb'):
+#             mask = skin_detection_utils.detect_skin_YcrCb(image, 0)
+#         elif (mode == 'HSV'):
+#             mask = skin_detection_utils.detect_skin_HSV(image, 0)
+#         else:
+#             mask = skin_detection_utils.detect_skin_RGB(image, 0)[0]
+#         return (mask,)
+
+
 class MaskComposite:
     def __init__(self):
         pass
@@ -802,19 +832,25 @@ NODE_CLASS_MAPPINGS = {
     'FaceBBoxDetect(FaceParsing)': FaceBBoxDetect,
     'BBoxListItemSelect(FaceParsing)': BBoxListItemSelect,
     'BBoxResize(FaceParsing)': BBoxResize,
-    'ImageSize(FaceParsing)': ImageSize,
-    'ImageResizeCalculator(FaceParsing)': ImageResizeCalculator,
+
     'ImageCropWithBBox(FaceParsing)': ImageCropWithBBox,
     'ImagePadWithBBox(FaceParsing)':ImagePadWithBBox,
     'ImageInsertWithBBox(FaceParsing)':ImageInsertWithBBox,
     'ImageListSelect(FaceParsing)':ImageListSelect,
+    'ImageSize(FaceParsing)': ImageSize,
+    'ImageResizeCalculator(FaceParsing)': ImageResizeCalculator,
+    
     'FaceParsingProcessorLoader(FaceParsing)': FaceParsingProcessorLoader,
     'FaceParsingModelLoader(FaceParsing)': FaceParsingModelLoader,
     'FaceParse(FaceParsing)': FaceParse,
     'FaceParsingResultsParser(FaceParsing)': FaceParsingResultsParser,
+
+    # 'SkinDetectTraditional(FaceParsing)':SkinDetectTraditional,
+    
     'MaskListComposite(FaceParsing)':MaskListComposite,
     'MaskListSelect(FaceParsing)':MaskListSelect,
     'MaskComposite(FaceParsing)':MaskComposite,
+    
     'GuidedFilter(FaceParsing)': GuidedFilter,
     'ColorAdjust(FaceParsing)': ColorAdjust,  
 }
