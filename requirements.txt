@@ -1,3 +1,4 @@
 opencv-contrib-python
 torchvision
 ultralytics
+matplotlib
