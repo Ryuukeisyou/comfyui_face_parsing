@@ -8,7 +8,7 @@ There are also auxiliary nodes for image and mask processing. A guided filter is
 Just clone the repo https://github.com/Ryuukeisyou/comfyui_face_parsing.git into ComfyUI's "custom_nodes" directory.
 
 # Requirements
-See requirements.txt. Specially, open-contrib-python is needed for guided filter. If you have other versions of opencv e.g. opencv-python-headless installed after open-contrib-python, you may need to uninstall open-contrib-python and reinstall it again.
+See requirements.txt. Specially, opencv-contrib-python is needed for guided filter. If you have other versions of opencv e.g. opencv-python-headless installed after open-contrib-python, you may need to uninstall opencv-contrib-python and reinstall it again.
 
 # Workflow
 a demo work flow is shown below.
