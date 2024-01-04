@@ -7,6 +7,7 @@ from torch import Tensor
 import torch.nn as nn
 import matplotlib.cm as cm
 import torchvision.transforms as T
+from torchvision import ops
 from torchvision.transforms import functional
 from ultralytics import YOLO
 
@@ -172,15 +173,22 @@ class ImageCropWithBBox:
     CATEGORY = "face_parsing"
 
     def main(self, bbox: Tensor, image: Tensor):
+        results = []
         image_permuted = image.permute(0, 3, 1, 2)
-        bbox_item = bbox[0]
-        bbox_int = bbox_item.int()
-        l = bbox_int[0]
-        t = bbox_int[1]
-        r = bbox_int[2]
-        b = bbox_int[3]
-        cropped_image = functional.crop(image_permuted, t, l, b-t, r-l) # type: ignore
-        final = cropped_image.permute(0, 2, 3, 1)
+        for image_item in image_permuted:
+            for bbox_item in bbox:
+                bbox_int = bbox_item.int()
+                l = bbox_int[0]
+                t = bbox_int[1]
+                r = bbox_int[2]
+                b = bbox_int[3]
+                cropped_image = functional.crop(image_item, t, l, b-t, r-l) # type: ignore
+                result = cropped_image.permute(1, 2, 0).unsqueeze(0)
+                results.append(result)
+        try: 
+            final = torch.cat(results, dim=0)
+        except:
+            final = results
         return (final,)
 
 class ImagePadWithBBox:
@@ -280,7 +288,10 @@ class ImageListSelect:
     CATEGORY = "face_parsing"
 
     def main(self, image: Tensor, index: int):
-        return (image[index].unsqueeze(0),)
+        if image is Tensor:
+            return (image[index].unsqueeze(0),)
+        else:
+            return (image[index],)
 
 class ImageSize:
     def __init__(self):
@@ -338,8 +349,9 @@ class ImageResizeCalculator:
     CATEGORY = "face_parsing"
 
     def main(self, image: Tensor, target_size: int, force_8x: bool):
-        w = image.shape[2]
-        h = image.shape[1]
+        w = image[0].shape[1]
+        h = image[0].shape[0]
+
         ratio = h * 1.0 / w
         if (w >= h):
             w_new = target_size
@@ -685,6 +697,43 @@ class MaskListSelect:
     def main(self, mask: Tensor, index: int):
         return (mask[index].unsqueeze(0),)
 
+class MaskToBBox:
+    def __init__(self):
+        pass
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "mask": ("MASK",),
+                "pad": ("INT", {
+                    "default": 0,
+                    "min": 0,
+                    "step": 1
+                }),
+            },
+        }
+ 
+    RETURN_TYPES = ("BBOX", )
+    # RETURN_NAMES = ("image")
+
+    FUNCTION = "main"
+
+    #OUTPUT_NODE = False
+
+    CATEGORY = "face_parsing"
+
+    def main(self, mask: Tensor, pad: int):
+        result = ops.masks_to_boxes(mask)
+        if pad != 0:
+            for item in result:
+                item[0] = item[0] - pad
+                item[1] = item[1] - pad
+                item[2] = item[2] + pad
+                item[3] = item[3] + pad
+
+        return (result,)
+
 class GuidedFilter:
     def __init__(self):
         pass
@@ -850,6 +899,7 @@ NODE_CLASS_MAPPINGS = {
     'MaskListComposite(FaceParsing)':MaskListComposite,
     'MaskListSelect(FaceParsing)':MaskListSelect,
     'MaskComposite(FaceParsing)':MaskComposite,
+    'MaskToBBox(FaceParsing)':MaskToBBox,
     
     'GuidedFilter(FaceParsing)': GuidedFilter,
     'ColorAdjust(FaceParsing)': ColorAdjust,  

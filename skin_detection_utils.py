@@ -8,7 +8,7 @@ import torch
 import cv2
 import numpy as np
 from numpy import ndarray
-import convertion_utils
+import conversion_utils
 import torchvision
 import matplotlib.pyplot as plt
 
@@ -50,7 +50,7 @@ def detect_skin_YcrCb(image: Tensor, kernel_size: int = 0) -> Tensor:
     '''
     Detect typical Asian skin using YCrCb method.
     '''
-    ycrcb = convertion_utils.tensor_to_cv2YCrCb(image)
+    ycrcb = conversion_utils.tensor_to_cv2YCrCb(image)
     cr = ycrcb[:, :, 1]
     cb = ycrcb[:, :, 2]
     mask = (133 <= cr) & (cr <= 173) & (77 <= cb) & (cb <= 127) # type: ignore
@@ -64,7 +64,7 @@ def detect_skin_HSV(image: Tensor, kernel_size: int = 0) -> Tensor:
     '''
     Detect typical Asian skin using HSV method.
     '''
-    hsv = convertion_utils.tensor_to_cv2HSV(image)
+    hsv = conversion_utils.tensor_to_cv2HSV(image)
     h = hsv[:, :, 0]
     s = hsv[:, :, 1]
     v = hsv[:, :, 2]
