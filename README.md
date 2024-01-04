@@ -4,6 +4,8 @@ The nodes utilize the [face parsing model](https://huggingface.co/jonathandinu/f
 
 There are also auxiliary nodes for image and mask processing. A guided filter is also provided for skin smoothing. 
 
+If you encounter any problems, feel free to open an issue. I'll try to fix it when I'm not busy. Besides, if you like the nodes, please give a star, thanks!
+
 # Installation
 Just clone the repo https://github.com/Ryuukeisyou/comfyui_face_parsing.git into ComfyUI's "custom_nodes" directory.
 
