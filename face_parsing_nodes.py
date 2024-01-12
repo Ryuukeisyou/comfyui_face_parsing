@@ -84,7 +84,7 @@ class FaceBBoxDetect:
                 bbox[1] = bbox[1] - dilation
                 bbox[2] = bbox[2] + dilation
                 bbox[3] = bbox[3] + dilation
-            results.append(bboxes)
+                results.append(bbox)
         return (results,)
 
 class BBoxListItemSelect:
@@ -141,16 +141,16 @@ class BBoxResize:
 
     def main(self, bbox: Tensor, width_old: int, height_old: int, width: int, height: int):
         newBbox = bbox.clone()
-        bbox_values = newBbox[0].float()
+        bbox_values = newBbox.float()
         l = bbox_values[0] / width_old * width
         t = bbox_values[1] / height_old * height
         r = bbox_values[2] / width_old * width
         b = bbox_values[3] / height_old * height
 
-        newBbox[0][0] = l
-        newBbox[0][1] = t
-        newBbox[0][2] = r
-        newBbox[0][3] = b
+        newBbox[0] = l
+        newBbox[1] = t
+        newBbox[2] = r
+        newBbox[3] = b
         return (newBbox,)
 
 class ImageCropWithBBox:
@@ -176,15 +176,14 @@ class ImageCropWithBBox:
         results = []
         image_permuted = image.permute(0, 3, 1, 2)
         for image_item in image_permuted:
-            for bbox_item in bbox:
-                bbox_int = bbox_item.int()
-                l = bbox_int[0]
-                t = bbox_int[1]
-                r = bbox_int[2]
-                b = bbox_int[3]
-                cropped_image = functional.crop(image_item, t, l, b-t, r-l) # type: ignore
-                result = cropped_image.permute(1, 2, 0).unsqueeze(0)
-                results.append(result)
+            bbox_int = bbox.int()
+            l = bbox_int[0]
+            t = bbox_int[1]
+            r = bbox_int[2]
+            b = bbox_int[3]
+            cropped_image = functional.crop(image_item, t, l, b-t, r-l) # type: ignore
+            result = cropped_image.permute(1, 2, 0).unsqueeze(0)
+            results.append(result)
         try: 
             final = torch.cat(results, dim=0)
         except:
@@ -214,8 +213,7 @@ class ImagePadWithBBox:
 
     def main(self, bbox: Tensor, width: int, height: int, image: Tensor):
         image_permuted = image.permute(0, 3, 1, 2)
-        bbox_item = bbox[0]
-        bbox_int = bbox_item.int()
+        bbox_int = bbox.int()
         l = bbox_int[0]
         t = bbox_int[1]
         r = bbox_int[2]
@@ -245,8 +243,7 @@ class ImageInsertWithBBox:
     CATEGORY = "face_parsing"
 
     def main(self, bbox: Tensor, image_src: Tensor, image: Tensor):
-        bbox_item = bbox[0]
-        bbox_int = bbox_item.int()
+        bbox_int = bbox.int()
         l = bbox_int[0]
         t = bbox_int[1]
         r = bbox_int[2]
