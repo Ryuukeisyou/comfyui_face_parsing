@@ -153,6 +153,112 @@ class BBoxResize:
         newBbox[3] = b
         return (newBbox,)
 
+class LatentCropWithBBox:
+    def __init__(self):
+        pass
+     
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "bbox": ("BBOX", {}),
+                "samples": ("LATENT", {}),
+            }
+        }
+
+    RETURN_TYPES = ("LATENT",)
+
+    FUNCTION = "main"
+
+    CATEGORY = "face_parsing"
+
+    def main(self, bbox: Tensor, samples: dict):
+        bbox_int = bbox.int() // 8
+        l = bbox_int[0]
+        t = bbox_int[1]
+        r = bbox_int[2]
+        b = bbox_int[3]
+
+        samples_value = samples['samples']
+        cropped_samples_value = functional.crop(samples_value, t, l, (b - t), (r - l))
+        result = {'samples': cropped_samples_value}
+
+        # if ('noise_mask' in samples and keep_mask):
+        #     noise_mask_value = samples['noise_mask']
+        #     cropped_noise_mask_value = functional.crop(noise_mask_value, t, l, b - t, r -l)
+        #     result['noise_mask'] = cropped_noise_mask_value
+
+        return (result,)
+
+class LatentInsertWithBBox:
+    def __init__(self):
+        pass
+     
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "bbox": ("BBOX", {}),
+                "samples_src": ("LATENT", {}),
+                "samples": ("LATENT", {}),
+            }
+        }
+
+    RETURN_TYPES = ("LATENT",)
+
+    FUNCTION = "main"
+
+    CATEGORY = "face_parsing"
+
+    def main(self, bbox: Tensor, samples_src: dict, samples: dict):
+        bbox_int = bbox.int() // 8
+
+        l = bbox_int[0]
+        t = bbox_int[1]
+        r = bbox_int[2]
+        b = bbox_int[3]
+
+        samples_src_val : Tensor = samples_src['samples']
+        w = samples_src_val.shape[3]
+        h = samples_src_val.shape[2]
+
+        mask = torch.zeros(samples_src_val.shape)
+        mask[:, :, t:b, l:r] = 1
+        
+        samples_val : Tensor = samples['samples']
+        resized_samples_val = functional.resize(samples_val, [(b - t),  (r - l)])
+        padded_samples_val = functional.pad(resized_samples_val, [l, t, (w - r), (h - b)])
+
+        final_samples_val = torch.where(mask == 0, samples_src_val, padded_samples_val)
+        result = {'samples': final_samples_val}
+
+        return (result,)
+
+class LatentSize:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "samples": ("LATENT", {}),
+            }
+        }
+
+    RETURN_TYPES = ("INT", "INT")
+    RETURN_NAMES = ("width", "height")
+
+    FUNCTION = "main"
+
+    CATEGORY = "face_parsing"
+
+    def main(self, samples: dict):
+        shape = samples['samples'].shape
+        h = shape[2] * 8
+        w = shape[3] * 8
+        return (w, h,)
+
 class ImageCropWithBBox:
     def __init__(self):
         pass
@@ -256,10 +362,41 @@ class ImageInsertWithBBox:
         padded = functional.pad(resized, [l, t, w - r, h - b])  # type: ignore
 
         src_permuted = image_src.permute(0, 3, 1, 2)
-        result = torch.where(padded == 0, src_permuted, padded)
+        mask = torch.zeros(src_permuted.shape)
+        mask[:, :, t:b, l:r] = 1
+        result = torch.where(mask == 0, src_permuted, padded)
 
         final = result.permute(0, 2, 3, 1)
         return (final,)
+
+class ImageResizeWithBBox:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "bbox": ("BBOX", {}),
+                "image": ("IMAGE", {}),
+            }
+        }
+    
+    RETURN_TYPES = ("IMAGE",)
+
+    FUNCTION = "main"
+
+    CATEGORY = "face_parsing"
+
+    def main(self, bbox: Tensor, image: Tensor):
+        bbox_int = bbox.int()
+        l = bbox_int[0]
+        t = bbox_int[1]
+        r = bbox_int[2]
+        b = bbox_int[3]
+
+        resized_image = functional.resize(image.permute(0, 3, 1, 2), [b - t, r - l]).permute(0, 2, 3, 1)
+        return (resized_image,)
 
 class ImageListSelect:
     def __init__(self):
@@ -336,8 +473,8 @@ class ImageResizeCalculator:
             },
         }
 
-    RETURN_TYPES = ("INT", "INT", "INT",)
-    RETURN_NAMES = ("width", "height", "min",)
+    RETURN_TYPES = ("INT", "INT", "INT", "FLOAT", "FLOAT")
+    RETURN_NAMES = ("width", "height", "min", "scale", "scale_r")
 
     FUNCTION = "main"
 
@@ -358,7 +495,7 @@ class ImageResizeCalculator:
                 h_new = int(h_new / 8) * 8
             # scale = target_size * 1.0 / w
             # scale_back = w / target_size * 1.0
-            return (w_new, int(h_new), h_new, )
+            return (w_new, int(h_new), h_new, w_new * 1.0 / w, w * 1.0 / w_new)
         else:
             w_new = target_size / ratio
             h_new = target_size
@@ -367,7 +504,7 @@ class ImageResizeCalculator:
                 h_new = int(h_new / 8) * 8
             # scale = target_size * 1.0 / h
             # scale_back = h / target_size * 1.0
-            return (int(w_new), h_new, w_new, )
+            return (int(w_new), h_new, w_new, h_new * 1.0 / h, h * 1.0 / h_new )
 
 class FaceParsingModelLoader:
     def __init__(self):
@@ -879,9 +1016,14 @@ NODE_CLASS_MAPPINGS = {
     'BBoxListItemSelect(FaceParsing)': BBoxListItemSelect,
     'BBoxResize(FaceParsing)': BBoxResize,
 
+    # 'LatentCropWithBBox(FaceParsing)': LatentCropWithBBox,
+    # 'LatentInsertWithBBox(FaceParsing)': LatentInsertWithBBox,
+    # 'LatentSize(FaceParsing)': LatentSize,
+
     'ImageCropWithBBox(FaceParsing)': ImageCropWithBBox,
     'ImagePadWithBBox(FaceParsing)':ImagePadWithBBox,
     'ImageInsertWithBBox(FaceParsing)':ImageInsertWithBBox,
+    'ImageResizeWithBBox(FaceParsing)':ImageResizeWithBBox,
     'ImageListSelect(FaceParsing)':ImageListSelect,
     'ImageSize(FaceParsing)': ImageSize,
     'ImageResizeCalculator(FaceParsing)': ImageResizeCalculator,
