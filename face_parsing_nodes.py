@@ -84,6 +84,10 @@ class FaceBBoxDetect:
                 bbox[1] = bbox[1] - dilation
                 bbox[2] = bbox[2] + dilation
                 bbox[3] = bbox[3] + dilation
+                bbox[0] = bbox[0] if bbox[0] > 0 else 0
+                bbox[1] = bbox[1] if bbox[1] > 0 else 0
+                bbox[2] = bbox[2] if bbox[2] < item.shape[1] else item.shape[1]
+                bbox[3] = bbox[3] if bbox[3] < item.shape[0] else item.shape[0]
                 results.append(bbox)
         return (results,)
 
@@ -406,7 +410,7 @@ class ImageListSelect:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "image": ("IMAGE", {}),
+                "images": ("IMAGE", {}),
                 "index": ("INT", {
                     "default": 0,
                     "min": 0,
@@ -415,17 +419,20 @@ class ImageListSelect:
             }
         }
  
+    INPUT_IS_LIST = True
+
     RETURN_TYPES = ("IMAGE", )
 
     FUNCTION = "main"
 
     CATEGORY = "face_parsing"
 
-    def main(self, image: Tensor, index: int):
-        if image is Tensor:
-            return (image[index].unsqueeze(0),)
+    def main(self, images, index):
+        index = index[0]
+        if images is Tensor:
+            return (images[index].unsqueeze(0),)
         else:
-            return (image[index],)
+            return (images[index],)
 
 class ImageSize:
     def __init__(self):
