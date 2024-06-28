@@ -10,6 +10,8 @@ ultralytics_bbox_path = os.path.join(models_path, "ultralytics", "bbox")
 
 if not os.path.exists(face_parsing_path):
     os.makedirs(face_parsing_path)
+if not os.path.exists(ultralytics_bbox_path):
+    os.makedirs(ultralytics_bbox_path)
 if not os.path.exists(os.path.join(face_parsing_path, "model.safetensors")):
     download_url("https://huggingface.co/jonathandinu/face-parsing/resolve/main/model.safetensors?download=true", face_parsing_path, "model.safetensors")
 if not os.path.exists(os.path.join(face_parsing_path, "config.json")):
