@@ -10,6 +10,6 @@ Repository = "https://github.com/Ryuukeisyou/comfyui_face_parsing"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = ""
-DisplayName = "comfyui_face_parsing"
+PublisherId = "ryuukeisyou"
+DisplayName = "Ryuukeisyou"
 Icon = ""
