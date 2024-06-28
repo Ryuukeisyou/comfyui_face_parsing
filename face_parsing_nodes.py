@@ -5,7 +5,7 @@ import folder_paths
 import torch
 from torch import Tensor
 import torch.nn as nn
-import matplotlib.cm as cm
+import matplotlib
 import torchvision.transforms as T
 from torchvision import ops
 from torchvision.transforms import functional
@@ -579,7 +579,7 @@ class FaceParse:
         images = []
         results = []
         transform = T.ToPILImage()
-        colormap = cm.get_cmap('viridis', 19)
+        colormap = matplotlib.colormaps['viridis']
 
         for item in image:
             size = item.shape[:2]
@@ -596,7 +596,9 @@ class FaceParse:
             pred_seg_np = pred_seg.detach().numpy().astype(np.uint8)
             results.append(torch.tensor(pred_seg_np))
             
-            colored = colormap(pred_seg_np)
+            norm = matplotlib.colors.Normalize(0, 18)
+            pred_seg_np_normed = norm(pred_seg_np)
+            colored = colormap(pred_seg_np_normed)
             colored_sliced = colored[:,:,:3] # type: ignore
             images.append(torch.tensor(colored_sliced))
 
