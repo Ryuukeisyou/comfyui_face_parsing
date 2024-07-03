@@ -480,8 +480,8 @@ class ImageResizeCalculator:
             },
         }
 
-    RETURN_TYPES = ("INT", "INT", "INT", "FLOAT", "FLOAT")
-    RETURN_NAMES = ("width", "height", "min", "scale", "scale_r")
+    RETURN_TYPES = ("INT", "INT", "INT", "INT", "INT", "FLOAT", "FLOAT")
+    RETURN_NAMES = ("width", "height", "width_old", "height_old", "min", "scale", "scale_r")
 
     FUNCTION = "main"
 
@@ -502,7 +502,7 @@ class ImageResizeCalculator:
                 h_new = int(h_new / 8) * 8
             # scale = target_size * 1.0 / w
             # scale_back = w / target_size * 1.0
-            return (w_new, int(h_new), h_new, w_new * 1.0 / w, w * 1.0 / w_new)
+            return (w_new, int(h_new), w, h, h_new, w_new * 1.0 / w, w * 1.0 / w_new)
         else:
             w_new = target_size / ratio
             h_new = target_size
@@ -511,7 +511,7 @@ class ImageResizeCalculator:
                 h_new = int(h_new / 8) * 8
             # scale = target_size * 1.0 / h
             # scale_back = h / target_size * 1.0
-            return (int(w_new), h_new, w_new, h_new * 1.0 / h, h * 1.0 / h_new )
+            return (int(w_new), h_new, w, h, w_new, h_new * 1.0 / h, h * 1.0 / h_new )
 
 class FaceParsingModelLoader:
     def __init__(self):
