@@ -876,6 +876,40 @@ class MaskToBBox:
                 item[3] = item[3] + pad
 
         return (result,)
+    
+class MaskInsertWithBBox:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "bbox": ("BBOX", {}),
+                "image_src": ("IMAGE", {}),
+                "mask": ("MASK", {}),
+            }
+        }
+    
+    RETURN_TYPES = ("MASK",)
+
+    FUNCTION = "main"
+
+    CATEGORY = "face_parsing"
+
+    def main(self, bbox: Tensor, image_src: Tensor, mask: Tensor):
+        bbox_int = bbox.int()
+        l = bbox_int[0]
+        t = bbox_int[1]
+        r = bbox_int[2]
+        b = bbox_int[3]
+
+        resized = functional.resize(mask, [b - t, r - l]) # type: ignore
+
+        _, h, w, c = image_src.shape
+        padded = functional.pad(resized, [l, t, w - r, h - b])  # type: ignore
+
+        return (padded,)
 
 class GuidedFilter:
     def __init__(self):
@@ -1044,10 +1078,11 @@ NODE_CLASS_MAPPINGS = {
 
     # 'SkinDetectTraditional(FaceParsing)':SkinDetectTraditional,
     
-    'MaskListComposite(FaceParsing)':MaskListComposite,
-    'MaskListSelect(FaceParsing)':MaskListSelect,
-    'MaskComposite(FaceParsing)':MaskComposite,
-    'MaskToBBox(FaceParsing)':MaskToBBox,
+    'MaskListComposite(FaceParsing)': MaskListComposite,
+    'MaskListSelect(FaceParsing)': MaskListSelect,
+    'MaskComposite(FaceParsing)': MaskComposite,
+    'MaskToBBox(FaceParsing)': MaskToBBox,
+    'MaskInsertWithBBox(FaceParsing)': MaskInsertWithBBox,
     
     'GuidedFilter(FaceParsing)': GuidedFilter,
     'ColorAdjust(FaceParsing)': ColorAdjust,  
