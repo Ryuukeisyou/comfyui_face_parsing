@@ -295,7 +295,7 @@ class ImageCropWithBBox:
             result = cropped_image.permute(1, 2, 0).unsqueeze(0)
             results.append(result)
         try: 
-            final = torch.cat(results, dim=0)
+            final = torch.stack(results, dim=0)
         except:
             final = results
         return (final,)
@@ -602,7 +602,8 @@ class FaceParse:
             colored_sliced = colored[:,:,:3] # type: ignore
             images.append(torch.tensor(colored_sliced))
 
-        return (torch.cat(images, dim=0).unsqueeze(0), torch.cat(results, dim=0).unsqueeze(0),)
+        images_batch = torch.stack(images, dim=0)
+        return (images_batch, results,)
     
 class FaceParsingResultsParser:
     def __init__(self):
@@ -705,7 +706,8 @@ class FaceParsingResultsParser:
             if (cloth):
                 mask = mask | torch.where(item == 18, 1, 0)         
             masks.append(mask.float())
-        final = torch.cat(masks, dim=0).unsqueeze(0)
+
+        final = torch.stack(masks, dim=0)
         return (final,)
 
 # class SkinDetectTraditional:
@@ -960,7 +962,7 @@ class GuidedFilter:
             result_cv2_rgb = cv2.cvtColor(result_cv2, cv2.COLOR_BGR2RGB)
             result = torch.tensor(result_cv2_rgb).float().div(255)
             results.append(result)
-        return (torch.cat(results, dim=0).unsqueeze(0),)
+        return (torch.stack(results, dim=0))
 
 class ColorAdjust:
     def __init__(self):
