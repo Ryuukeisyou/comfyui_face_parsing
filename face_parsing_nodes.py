@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import folder_paths
 import torch
+from torch.nn import functional as F
 from torch import Tensor
 import torch.nn as nn
 import matplotlib
@@ -10,6 +11,7 @@ import torchvision.transforms as T
 from torchvision import ops
 from torchvision.transforms import functional
 from ultralytics import YOLO
+from typing import Optional, List
 
 models_path = folder_paths.models_dir
 face_parsing_path = os.path.join(models_path, "face_parsing")
@@ -62,6 +64,9 @@ class FaceBBoxDetect:
                     "min": -512,
                     "max": 512,
                     "step": 1
+                }),
+                "uniform_size": ("BOOLEAN", {
+                    "default": True,
                 })
             }
         }
@@ -72,14 +77,45 @@ class FaceBBoxDetect:
 
     CATEGORY = "face_parsing"
 
-    def main(self, bbox_detector: YOLO, image: Tensor, threshold: float, dilation: int):
+    @staticmethod
+    def pad_bbox(bbox, target_shape):
+        """Add padding to a bounding box to match it to the given target shape."""
+        h = bbox[3] - bbox[1]
+        w = bbox[2] - bbox[0]
+        pad_h = target_shape[0] - h
+        pad_w = target_shape[1] - w
+
+        padding = (0, 0, 0, 0)  # [left, right, top, bottom]
+
+        if pad_w > 0:
+            left = pad_w // 2
+            right = pad_w - left
+            padding = (left, right) + padding[2:]
+
+        if pad_h > 0:
+            top = pad_h // 2
+            bottom = pad_h - top
+            padding = padding[:2] + (top, bottom)
+
+        bbox[0] = bbox[0] - padding[0]
+        bbox[1] = bbox[1] - padding[2]
+        bbox[2] = bbox[2] + padding[1]
+        bbox[3] = bbox[3] + padding[3]
+        return bbox
+
+
+    def main(self, bbox_detector: YOLO, image: Tensor, threshold: float, dilation: int, uniform_size: bool):
         results = []
         transform = T.ToPILImage()
+        max_height = 0
+        max_width = 0
+
         for item in image:
             image_pil = transform(item.permute(2, 0, 1))
             pred = bbox_detector(image_pil, conf=threshold)
             bboxes = pred[0].boxes.xyxy.cpu()
             for bbox in bboxes:
+                bbox = bbox.int()
                 bbox[0] = bbox[0] - dilation
                 bbox[1] = bbox[1] - dilation
                 bbox[2] = bbox[2] + dilation
@@ -88,8 +124,23 @@ class FaceBBoxDetect:
                 bbox[1] = bbox[1] if bbox[1] > 0 else 0
                 bbox[2] = bbox[2] if bbox[2] < item.shape[1] else item.shape[1]
                 bbox[3] = bbox[3] if bbox[3] < item.shape[0] else item.shape[0]
+
                 results.append(bbox)
-        return (results,)
+
+                max_height = max(max_height, bbox[3] - bbox[1])
+                max_width = max(max_width, bbox[2] - bbox[0])
+
+        results_padded = []
+
+        # Normalize the size of the bounding boxes, so they all have a uniform size
+        if uniform_size:
+            for bbox in results:
+                bbox_pad = self.pad_bbox(bbox, (max_height, max_width))
+                results_padded.append(bbox_pad)
+        else:
+            results_padded = results
+
+        return (results_padded,)
 
 class BBoxListItemSelect:
     def __init__(self):
@@ -271,8 +322,11 @@ class ImageCropWithBBox:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "bbox": ("BBOX", {}),
                 "image": ("IMAGE", {}),
+            },
+            "optional": {
+                "bbox": ("BBOX", {}),
+                "bbox_list": ("BBOX_LIST", {})
             }
         }
 
@@ -282,22 +336,31 @@ class ImageCropWithBBox:
 
     CATEGORY = "face_parsing"
 
-    def main(self, bbox: Tensor, image: Tensor):
+    def main(self, image: Tensor, bbox: Optional[Tensor] = None, bbox_list: Optional[List[Tensor]] = None):
         results = []
         image_permuted = image.permute(0, 3, 1, 2)
-        for image_item in image_permuted:
-            bbox_int = bbox.int()
+
+        if bbox_list is None and bbox is None:
+            return (image,)
+
+        if bbox_list is None:
+            bbox_list = [bbox] * len(image_permuted)
+
+        for i in range(len(image_permuted)):
+            bbox_item = bbox_list[i]
+            bbox_int = bbox_item.int()
             l = bbox_int[0]
             t = bbox_int[1]
             r = bbox_int[2]
             b = bbox_int[3]
-            cropped_image = functional.crop(image_item, t, l, b-t, r-l) # type: ignore
-            result = cropped_image.permute(1, 2, 0).unsqueeze(0)
+            cropped_image = functional.crop(image_permuted[i], t, l, b-t, r-l) # type: ignore
+
+            result = cropped_image.permute(1, 2, 0)
             results.append(result)
-        try: 
-            final = torch.stack(results, dim=0)
-        except:
-            final = results
+
+        # Stack the padded images
+        final = torch.stack(results, dim=0)
+
         return (final,)
 
 class ImagePadWithBBox:
@@ -581,7 +644,9 @@ class FaceParse:
         transform = T.ToPILImage()
         colormap = matplotlib.colormaps['viridis']
 
-        for item in image:
+        for i in range(len(image)):
+            print(f"Processing FaceParse for image {i+1} / {len(image)}")
+            item = image[i]
             size = item.shape[:2]
             inputs = processor(images=transform(item.permute(2, 0, 1)), return_tensors="pt")
             outputs = model(**inputs)
@@ -887,9 +952,12 @@ class MaskInsertWithBBox:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "bbox": ("BBOX", {}),
                 "image_src": ("IMAGE", {}),
                 "mask": ("MASK", {}),
+            },
+            "optional": {
+                "bbox": ("BBOX", {}),
+                "bbox_list": ("BBOX_LIST", {}),
             }
         }
     
@@ -899,19 +967,34 @@ class MaskInsertWithBBox:
 
     CATEGORY = "face_parsing"
 
-    def main(self, bbox: Tensor, image_src: Tensor, mask: Tensor):
-        bbox_int = bbox.int()
-        l = bbox_int[0]
-        t = bbox_int[1]
-        r = bbox_int[2]
-        b = bbox_int[3]
+    def main(self, image_src: Tensor, mask: Tensor, bbox: Optional[Tensor] = None, bbox_list: Optional[List[Tensor]] = None):
 
-        resized = functional.resize(mask, [b - t, r - l]) # type: ignore
+        if bbox is None and bbox_list is None:
+            return (mask,)
+
+        if bbox_list is None:
+            bbox_list = [bbox] * len(mask)
 
         _, h, w, c = image_src.shape
-        padded = functional.pad(resized, [l, t, w - r, h - b])  # type: ignore
+        results = []
 
-        return (padded,)
+        for i in range(len(mask)):
+            bbox_item = bbox_list[i]
+            bbox_int = bbox_item.int()
+
+            # bbox_int = bbox.int()
+            l = bbox_int[0]
+            t = bbox_int[1]
+            r = bbox_int[2]
+            b = bbox_int[3]
+
+            resized = functional.resize(mask[i], [b - t, r - l]) # type: ignore
+            padded = functional.pad(resized, [l, t, w - r, h - b])  # type: ignore
+
+            results.append(padded)
+
+        result = torch.stack(results, dim=0)
+        return (result,)
 
 class GuidedFilter:
     def __init__(self):
