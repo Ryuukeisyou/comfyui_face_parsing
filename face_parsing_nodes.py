@@ -20,10 +20,16 @@ class FaceBBoxDetectorLoader:
         pass
 
     @classmethod
-    def INPUT_TYPES(cls):
+    def GetModelList(cls) -> list[str]:
         files = folder_paths.get_filename_list("ultralytics_bbox")
         face_detect_models = list(filter(lambda x: 'face' in x, files))
         bboxs = ["bbox/" + x for x in face_detect_models]
+        return bboxs
+    
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        bboxs = cls.GetModelList()
         return {
             "required": {
                 "model_name": (bboxs, {})
