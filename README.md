@@ -15,7 +15,7 @@ On first run, some required files will be downloaded to ComfyUI's "models/face_p
 2. Download the face_yolov8m.pt from the [Bingsu/adetailer](https://huggingface.co/Bingsu/adetailer/) repo and save it to "models/ultralytics/bbox" folder.
 
 # Requirements
-See requirements.txt. Specially, opencv-contrib-python is needed for guided filter. If you have other versions of opencv e.g. opencv-python-headless installed after open-contrib-python, you may need to uninstall opencv-contrib-python and reinstall it again.
+See requirements.txt. Specially, opencv-contrib-python is needed for guided filter. If you have other versions of opencv e.g. opencv-python-headless installed after open-contrib-python, you may need to uninstall opencv-contrib-python and reinstall it again. Note: If you don't need guided filter, you can just forget about opencv-contrib-python, as it is often conflicted by other opencv versions.
 
 # Workflow
 a demo work flow is shown below.
