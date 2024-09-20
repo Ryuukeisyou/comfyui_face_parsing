@@ -1,4 +1,4 @@
-import os
+import os 
 import cv2
 import numpy as np
 import folder_paths
@@ -538,6 +538,8 @@ class FaceParsingModelLoader:
     def main(self):
         from transformers import AutoModelForSemanticSegmentation
         model = AutoModelForSemanticSegmentation.from_pretrained(face_parsing_path)
+        if torch.cuda.is_available():
+            model = model.cuda()
         return (model,)
 
 class FaceParsingProcessorLoader:
@@ -586,12 +588,17 @@ class FaceParse:
         results = []
         transform = T.ToPILImage()
         colormap = matplotlib.colormaps['viridis']
+        device = next(model.parameters()).device
 
         for item in image:
             size = item.shape[:2]
-            inputs = processor(images=transform(item.permute(2, 0, 1)), return_tensors="pt")
+            pil_image = transform(item.permute(2, 0, 1))
+            inputs = processor(images=pil_image, return_tensors="pt")
+            # move input to GPU
+            inputs = {k: v.to(device) for k, v in inputs.items()}
+            
             outputs = model(**inputs)
-            logits = outputs.logits.cpu()
+            logits = outputs.logits
             upsampled_logits = nn.functional.interpolate(
                 logits,
                 size=size,
@@ -599,11 +606,11 @@ class FaceParse:
                 align_corners=False)
             
             pred_seg = upsampled_logits.argmax(dim=1)[0]
-            pred_seg_np = pred_seg.detach().numpy().astype(np.uint8)
-            results.append(torch.tensor(pred_seg_np))
+            pred_seg_cpu = pred_seg.cpu().detach().numpy().astype(np.uint8)
+            results.append(torch.tensor(pred_seg_cpu))
             
             norm = matplotlib.colors.Normalize(0, 18)
-            pred_seg_np_normed = norm(pred_seg_np)
+            pred_seg_np_normed = norm(pred_seg_cpu)
             colored = colormap(pred_seg_np_normed)
             colored_sliced = colored[:,:,:3] # type: ignore
             images.append(torch.tensor(colored_sliced))
@@ -670,8 +677,9 @@ class FaceParsingResultsParser:
             neck: bool,
             cloth: bool):
         masks = []
+        device = result.device
         for item in result:
-            mask = torch.zeros(item.shape, dtype=torch.uint8)
+            mask = torch.zeros(item.shape, dtype=torch.uint8, device=device)
             if (background):
                 mask = mask | torch.where(item == 0, 1, 0)
             if (skin):
@@ -713,7 +721,6 @@ class FaceParsingResultsParser:
             masks.append(mask.float())
         final = torch.cat(masks, dim=0).unsqueeze(0)
         return (final,)
-
 # class SkinDetectTraditional:
 #     def __init__(self):
 #         pass
