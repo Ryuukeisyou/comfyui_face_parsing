@@ -9,7 +9,6 @@ import matplotlib
 import torchvision.transforms as T
 from torchvision import ops
 from torchvision.transforms import functional
-from ultralytics import YOLO
 
 models_path = folder_paths.models_dir
 face_parsing_path = os.path.join(models_path, "face_parsing")
@@ -43,6 +42,7 @@ class FaceBBoxDetectorLoader:
     CATEGORY = "face_parsing"
 
     def main(self, model_name):
+        from ultralytics import YOLO
         model_path = folder_paths.get_full_path("ultralytics", model_name)
         model = YOLO(model_path) # type: ignore
         return (model, ) 
@@ -78,7 +78,7 @@ class FaceBBoxDetect:
 
     CATEGORY = "face_parsing"
 
-    def main(self, bbox_detector: YOLO, image: Tensor, threshold: float, dilation: int):
+    def main(self, bbox_detector, image: Tensor, threshold: float, dilation: int):
         results = []
         transform = T.ToPILImage()
         for item in image:
@@ -184,10 +184,10 @@ class LatentCropWithBBox:
 
     def main(self, bbox: Tensor, samples: dict):
         bbox_int = bbox.int() // 8
-        l = bbox_int[0]
-        t = bbox_int[1]
-        r = bbox_int[2]
-        b = bbox_int[3]
+        l = int(bbox_int[0])
+        t = int(bbox_int[1])
+        r = int(bbox_int[2])
+        b = int(bbox_int[3])
 
         samples_value = samples['samples']
         cropped_samples_value = functional.crop(samples_value, t, l, (b - t), (r - l))
@@ -223,10 +223,10 @@ class LatentInsertWithBBox:
     def main(self, bbox: Tensor, samples_src: dict, samples: dict):
         bbox_int = bbox.int() // 8
 
-        l = bbox_int[0]
-        t = bbox_int[1]
-        r = bbox_int[2]
-        b = bbox_int[3]
+        l = int(bbox_int[0])
+        t = int(bbox_int[1])
+        r = int(bbox_int[2])
+        b = int(bbox_int[3])
 
         samples_src_val : Tensor = samples_src['samples']
         w = samples_src_val.shape[3]
@@ -298,13 +298,13 @@ class ImageCropWithBBox:
             r = bbox_int[2]
             b = bbox_int[3]
             cropped_image = functional.crop(image_item, t, l, b-t, r-l) # type: ignore
-            result = cropped_image.permute(1, 2, 0).unsqueeze(0)
+            result = cropped_image.permute(1, 2, 0)
             results.append(result)
         try: 
-            final = torch.cat(results, dim=0)
+            results = torch.stack(results, dim=0)
         except:
-            final = results
-        return (final,)
+            pass
+        return (results,)
 
 class ImagePadWithBBox:
     def __init__(self):
@@ -400,10 +400,10 @@ class ImageResizeWithBBox:
 
     def main(self, bbox: Tensor, image: Tensor):
         bbox_int = bbox.int()
-        l = bbox_int[0]
-        t = bbox_int[1]
-        r = bbox_int[2]
-        b = bbox_int[3]
+        l = int(bbox_int[0])
+        t = int(bbox_int[1])
+        r = int(bbox_int[2])
+        b = int(bbox_int[3])
 
         resized_image = functional.resize(image.permute(0, 3, 1, 2), [b - t, r - l]).permute(0, 2, 3, 1)
         return (resized_image,)
@@ -482,6 +482,9 @@ class ImageResizeCalculator:
                 }),
                 "force_8x": ("BOOLEAN", {
                     "default": True,
+                }),
+                "force_64x": ("BOOLEAN", {
+                    "default": False,
                 })
             },
         }
@@ -495,7 +498,7 @@ class ImageResizeCalculator:
 
     CATEGORY = "face_parsing"
 
-    def main(self, image: Tensor, target_size: int, force_8x: bool):
+    def main(self, image: Tensor, target_size: int, force_8x: bool, force_64x: bool):
         w = image[0].shape[1]
         h = image[0].shape[0]
 
@@ -503,7 +506,10 @@ class ImageResizeCalculator:
         if (w >= h):
             w_new = target_size
             h_new = target_size * ratio
-            if force_8x:
+            if force_64x:
+                w_new = int(w_new / 64) * 64
+                h_new = int(h_new / 64) * 64
+            elif force_8x:
                 w_new = int(w_new / 8) * 8
                 h_new = int(h_new / 8) * 8
             # scale = target_size * 1.0 / w
@@ -512,7 +518,10 @@ class ImageResizeCalculator:
         else:
             w_new = target_size / ratio
             h_new = target_size
-            if force_8x:
+            if force_64x:
+                w_new = int(w_new / 64) * 64
+                h_new = int(h_new / 64) * 64
+            elif force_8x:
                 w_new = int(w_new / 8) * 8
                 h_new = int(h_new / 8) * 8
             # scale = target_size * 1.0 / h
@@ -526,7 +535,11 @@ class FaceParsingModelLoader:
     @classmethod
     def INPUT_TYPES(cls):
         return {
-            "required": {}
+            "required": {
+                "device": (["cpu", "cuda"], {
+                    "default": "cpu"
+                    })
+            }
         }
  
     RETURN_TYPES = ("FACE_PARSING_MODEL", )
@@ -535,9 +548,11 @@ class FaceParsingModelLoader:
 
     CATEGORY = "face_parsing"
 
-    def main(self):
+    def main(self, device: str):
         from transformers import AutoModelForSemanticSegmentation
         model = AutoModelForSemanticSegmentation.from_pretrained(face_parsing_path)
+        if device == "cuda" and torch.cuda.is_available():
+            model.cuda()
         return (model,)
 
 class FaceParsingProcessorLoader:
@@ -571,7 +586,7 @@ class FaceParse:
             "required": {
                 "model": ("FACE_PARSING_MODEL", {}),
                 "processor": ("FACE_PARSING_PROCESSOR", {}),
-                "image": ("IMAGE", {})
+                "image": ("IMAGE", {}),
             }
         }
 
@@ -586,12 +601,14 @@ class FaceParse:
         results = []
         transform = T.ToPILImage()
         colormap = matplotlib.colormaps['viridis']
+        device = model.device
 
         for item in image:
             size = item.shape[:2]
             inputs = processor(images=transform(item.permute(2, 0, 1)), return_tensors="pt")
+            inputs = {k: v.to(device) for k, v in inputs.items()}
             outputs = model(**inputs)
-            logits = outputs.logits.cpu()
+            logits = outputs.logits
             upsampled_logits = nn.functional.interpolate(
                 logits,
                 size=size,
@@ -599,7 +616,7 @@ class FaceParse:
                 align_corners=False)
             
             pred_seg = upsampled_logits.argmax(dim=1)[0]
-            pred_seg_np = pred_seg.detach().numpy().astype(np.uint8)
+            pred_seg_np = pred_seg.cpu().detach().numpy().astype(np.uint8)
             results.append(torch.tensor(pred_seg_np))
             
             norm = matplotlib.colors.Normalize(0, 18)
@@ -608,7 +625,9 @@ class FaceParse:
             colored_sliced = colored[:,:,:3] # type: ignore
             images.append(torch.tensor(colored_sliced))
 
-        return (torch.cat(images, dim=0).unsqueeze(0), torch.cat(results, dim=0).unsqueeze(0),)
+        images_out = torch.stack(images, dim=0)
+        results_out = torch.stack(results, dim=0)
+        return (images_out, results_out,)
     
 class FaceParsingResultsParser:
     def __init__(self):
@@ -711,8 +730,8 @@ class FaceParsingResultsParser:
             if (cloth):
                 mask = mask | torch.where(item == 18, 1, 0)         
             masks.append(mask.float())
-        final = torch.cat(masks, dim=0).unsqueeze(0)
-        return (final,)
+        masks_out = torch.stack(masks, dim=0)
+        return (masks_out,)
 
 # class SkinDetectTraditional:
 #     def __init__(self):
@@ -966,7 +985,7 @@ class GuidedFilter:
             result_cv2_rgb = cv2.cvtColor(result_cv2, cv2.COLOR_BGR2RGB)
             result = torch.tensor(result_cv2_rgb).float().div(255)
             results.append(result)
-        return (torch.cat(results, dim=0).unsqueeze(0),)
+        return (torch.stack(results, dim=0),)
 
 class ColorAdjust:
     def __init__(self):
