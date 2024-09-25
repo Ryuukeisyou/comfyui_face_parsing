@@ -1,6 +1,6 @@
 [project]
 name = "comfyui_face_parsing"
-description = "This is a set of custom nodes for ComfyUI. The nodes utilize the [a/face parsing model](https://huggingface.co/jonathandinu/face-parsing) to provide detailed segmantation of face. To improve face segmantation accuracy, [a/yolov8 face model](https://huggingface.co/Bingsu/adetailer/) is used to first extract face from an image. There are also auxiliary nodes for image and mask processing. A guided filter is also provided for skin smoothing."
+description = "This is a set of custom nodes for ComfyUI. The nodes utilize the [a/face parsing model](https://huggingface.co/jonathandinu/face-parsing) to parse face and provide detailed segmantation. To improve face segmantation accuracy, [a/yolov8 face model](https://huggingface.co/Bingsu/adetailer/) is used to first extract face from an image. There are also auxiliary nodes for image and mask processing. A guided filter is also provided for skin smoothing."
 version = "1.0.3"
 license = { file = "LICENSE" }
 dependencies = ["opencv-contrib-python", "torchvision", "ultralytics", "matplotlib"]
