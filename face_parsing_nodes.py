@@ -1,5 +1,6 @@
 import os
 import cv2
+import matplotlib.colors
 import numpy as np
 import folder_paths
 import torch
@@ -14,15 +15,16 @@ models_path = folder_paths.models_dir
 face_parsing_path = os.path.join(models_path, "face_parsing")
 cur_dir = os.path.dirname(__file__)
 
-class FaceBBoxDetectorLoader:
+class BBoxDetectorLoader:
     def __init__(self):
         pass
 
     @classmethod
     def GetModelList(cls) -> list[str]:
         files = folder_paths.get_filename_list("ultralytics_bbox")
-        face_detect_models = list(filter(lambda x: 'face' in x, files))
-        bboxs = ["bbox/" + x for x in face_detect_models]
+        # face_detect_models = list(filter(lambda x: 'face' in x, files))
+        # bboxs = ["bbox/" + x for x in face_detect_models]
+        bboxs = ["bbox/" + x for x in files]
         return bboxs
     
     
@@ -46,8 +48,8 @@ class FaceBBoxDetectorLoader:
         model_path = folder_paths.get_full_path("ultralytics", model_name)
         model = YOLO(model_path) # type: ignore
         return (model, ) 
-    
-class FaceBBoxDetect:
+
+class BBoxDetect:
     def __init__(self):
         pass
 
@@ -72,7 +74,9 @@ class FaceBBoxDetect:
             }
         }
 
-    RETURN_TYPES = ("BBOX_LIST",)
+    RETURN_TYPES = ("BBOX_LIST", "INT", )
+
+    RETURN_NAMES = ("BBOX_LIST", "count")
 
     FUNCTION = "main"
 
@@ -95,7 +99,7 @@ class FaceBBoxDetect:
                 bbox[2] = bbox[2] if bbox[2] < item.shape[1] else item.shape[1]
                 bbox[3] = bbox[3] if bbox[3] < item.shape[0] else item.shape[0]
                 results.append(bbox)
-        return (results,)
+        return (results, len(results))
 
 class BBoxListItemSelect:
     def __init__(self):
@@ -300,6 +304,44 @@ class ImageCropWithBBox:
             cropped_image = functional.crop(image_item, t, l, b-t, r-l) # type: ignore
             result = cropped_image.permute(1, 2, 0)
             results.append(result)
+        try: 
+            results = torch.stack(results, dim=0)
+        except:
+            pass
+        return (results,)
+
+class ImageCropWithBBoxList:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "bbox_list": ("BBOX_LIST", {}),
+                "image": ("IMAGE", {}),
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE",)
+
+    FUNCTION = "main"
+
+    CATEGORY = "face_parsing"
+
+    def main(self, bbox_list: list[Tensor], image: Tensor):
+        results = []
+        image_permuted = image.permute(0, 3, 1, 2)
+        for image_item in image_permuted:
+            for bbox in bbox_list:
+                bbox_int = bbox.int()
+                l = bbox_int[0]
+                t = bbox_int[1]
+                r = bbox_int[2]
+                b = bbox_int[3]
+                cropped_image = functional.crop(image_item, t, l, b-t, r-l) # type: ignore
+                result = cropped_image.permute(1, 2, 0)
+                results.append(result)
         try: 
             results = torch.stack(results, dim=0)
         except:
@@ -628,7 +670,7 @@ class FaceParse:
         images_out = torch.stack(images, dim=0)
         results_out = torch.stack(results, dim=0)
         return (images_out, results_out,)
-    
+
 class FaceParsingResultsParser:
     def __init__(self):
         pass
@@ -736,7 +778,7 @@ class FaceParsingResultsParser:
 # class SkinDetectTraditional:
 #     def __init__(self):
 #         pass
-    
+
 #     @classmethod
 #     def INPUT_TYPES(cls):
 #         return {
@@ -745,7 +787,7 @@ class FaceParsingResultsParser:
 #                 "mode": (["RGB", "YCrCb", "HSV"], {})
 #             }
 #         }
- 
+
 #     RETURN_TYPES = ("MASK", )
 
 #     FUNCTION = "main"
@@ -762,6 +804,91 @@ class FaceParsingResultsParser:
 #             mask = skin_detection_utils.detect_skin_RGB(image, 0)[0]
 #         return (mask,)
 
+class MaskBorderDissolve:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "mask": ("MASK", {}),
+                "size": ("INT", {
+                    "default": 10
+                    }),
+                "kernel_size": ("INT", {
+                    "default": 5,
+                    }),
+                "sigma": ("FLOAT", {
+                    "default": 0,
+                    }),
+            }
+        }
+
+    RETURN_TYPES = ("MASK",)
+
+    FUNCTION = "main"
+
+    CATEGORY = "face_parsing"
+
+    def main(self, mask: Tensor, size: int, kernel_size: int, sigma: float):
+        results = []
+        if kernel_size % 2 == 0:
+            kernel_size += 1
+        for mask_item in mask:
+            white = torch.ones_like(mask_item, dtype=torch.float32)
+            if len(white.shape) == 2:
+                white = white.unsqueeze(0)
+            _, h, w = white.shape
+            white[:, size : h - 1 - size, size : w - 1 - size] = 0
+            blurred = functional.gaussian_blur(white, kernel_size=[kernel_size, kernel_size], sigma=None if sigma == 0 else [sigma, sigma])
+            blurred = blurred.squeeze(0)
+            result = mask_item - blurred
+            result = torch.clamp(result, min=0)
+                        
+            results.append(result)
+        try: 
+            results = torch.stack(results, dim=0)
+        except:
+            pass
+        return (results,)
+
+class MaskCropWithBBox:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "bbox": ("BBOX", {}),
+                "mask": ("MASK", {}),
+            }
+        }
+
+    RETURN_TYPES = ("MASK",)
+
+    FUNCTION = "main"
+
+    CATEGORY = "face_parsing"
+
+    def main(self, bbox: Tensor, mask: Tensor):
+        results = []
+        mask_permuted = mask.permute(0, 3, 1, 2)
+        for mask_item in mask_permuted:
+            bbox_int = bbox.int()
+            l = bbox_int[0]
+            t = bbox_int[1]
+            r = bbox_int[2]
+            b = bbox_int[3]
+            cropped_mask = functional.crop(mask_item, t, l, b-t, r-l) # type: ignore
+            result = cropped_mask.permute(1, 2, 0)
+            results.append(result)
+        try: 
+            results = torch.stack(results, dim=0)
+        except:
+            pass
+        return (results,)
 
 class MaskComposite:
     def __init__(self):
@@ -802,7 +929,7 @@ class MaskComposite:
             mask_result = mask_result ^ source
         return (mask_result,)
 
-class MaskListComposite:
+class MaskBatchComposite:
     def __init__(self):
         pass
     
@@ -865,7 +992,7 @@ class MaskListSelect:
     def main(self, mask: Tensor, index: int):
         return (mask[index].unsqueeze(0),)
 
-class MaskToBBox:
+class MaskToBBoxList:
     def __init__(self):
         pass
     
@@ -882,8 +1009,8 @@ class MaskToBBox:
             },
         }
  
-    RETURN_TYPES = ("BBOX", )
-    # RETURN_NAMES = ("image")
+    RETURN_TYPES = ("BBOX_LIST", )
+    # RETURN_NAMES = ("BBOX_LIST")
 
     FUNCTION = "main"
 
@@ -900,8 +1027,8 @@ class MaskToBBox:
                 item[2] = item[2] + pad
                 item[3] = item[3] + pad
 
-        return (result,)
-    
+        return ([item for item in result],)
+
 class MaskInsertWithBBox:
     def __init__(self):
         pass
@@ -1079,8 +1206,8 @@ class ColorAdjust:
 
 
 NODE_CLASS_MAPPINGS = {
-    'FaceBBoxDetectorLoader(FaceParsing)': FaceBBoxDetectorLoader,
-    'FaceBBoxDetect(FaceParsing)': FaceBBoxDetect,
+    'BBoxDetectorLoader(FaceParsing)': BBoxDetectorLoader,
+    'BBoxDetect(FaceParsing)': BBoxDetect,
     'BBoxListItemSelect(FaceParsing)': BBoxListItemSelect,
     'BBoxResize(FaceParsing)': BBoxResize,
 
@@ -1089,6 +1216,7 @@ NODE_CLASS_MAPPINGS = {
     # 'LatentSize(FaceParsing)': LatentSize,
 
     'ImageCropWithBBox(FaceParsing)': ImageCropWithBBox,
+    'ImageCropWithBBoxList(FaceParsing)': ImageCropWithBBoxList,
     'ImagePadWithBBox(FaceParsing)':ImagePadWithBBox,
     'ImageInsertWithBBox(FaceParsing)':ImageInsertWithBBox,
     'ImageResizeWithBBox(FaceParsing)':ImageResizeWithBBox,
@@ -1103,10 +1231,12 @@ NODE_CLASS_MAPPINGS = {
 
     # 'SkinDetectTraditional(FaceParsing)':SkinDetectTraditional,
     
-    'MaskListComposite(FaceParsing)': MaskListComposite,
+    'MaskBorderDissolve(FaceParsing)':MaskBorderDissolve,
+    'MaskCropWithBBox(FaceParsing)': MaskCropWithBBox,
+    'MaskBatchComposite(FaceParsing)': MaskBatchComposite,
     'MaskListSelect(FaceParsing)': MaskListSelect,
     'MaskComposite(FaceParsing)': MaskComposite,
-    'MaskToBBox(FaceParsing)': MaskToBBox,
+    'MaskToBBoxList(FaceParsing)': MaskToBBoxList,
     'MaskInsertWithBBox(FaceParsing)': MaskInsertWithBBox,
     
     'GuidedFilter(FaceParsing)': GuidedFilter,
