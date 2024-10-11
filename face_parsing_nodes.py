@@ -927,6 +927,7 @@ class MaskComposite:
             mask_result = mask_result | source
         if (operation == 'xor'):
             mask_result = mask_result ^ source
+        mask_result = torch.clamp(mask_result, min=0)
         return (mask_result,)
 
 class MaskBatchComposite:
