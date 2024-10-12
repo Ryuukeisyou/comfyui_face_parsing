@@ -167,6 +167,35 @@ class BBoxResize:
         newBbox[3] = b
         return (newBbox,)
 
+class BBoxDecompose:
+    def __init__(self):
+        pass
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "bbox": ("BBOX", {}),
+            },
+        }
+
+    RETURN_TYPES = ("INT", "INT", "INT", "INT",)
+    RETURN_NAMES = ("l", "t", "r", "b")
+
+    FUNCTION = "main"
+
+    #OUTPUT_NODE = False
+
+    CATEGORY = "face_parsing"
+
+    def main(self, bbox: Tensor):
+        bbox_int = bbox.int()
+        l = int(bbox_int[0])
+        t = int(bbox_int[1])
+        r = int(bbox_int[2])
+        b = int(bbox_int[3])
+        return (l, t, r, b)
+
 class LatentCropWithBBox:
     def __init__(self):
         pass
@@ -842,9 +871,58 @@ class MaskBorderDissolve:
             _, h, w = white.shape
             white[:, size : h - 1 - size, size : w - 1 - size] = 0
             blurred = functional.gaussian_blur(white, kernel_size=[kernel_size, kernel_size], sigma=None if sigma == 0 else [sigma, sigma])
-            blurred = blurred.squeeze(0)
             result = mask_item - blurred
+            if len(mask_item.shape) == 2 and len(result.shape) == 3:
+                result = result.squeeze(0)
             result = torch.clamp(result, min=0)
+                        
+            results.append(result)
+        try: 
+            results = torch.stack(results, dim=0)
+        except:
+            pass
+        return (results,)
+    
+class MaskBlackOut:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        directions = ["left", "top", "right", "bottom"]
+        return {
+            "required": {
+                "mask": ("MASK", {}),
+                "direction": (directions, {
+                    "default": "top"
+                    }),
+                "position": ("INT", {
+                    "default": 10,
+                    }),
+            }
+        }
+
+    RETURN_TYPES = ("MASK",)
+
+    FUNCTION = "main"
+
+    CATEGORY = "face_parsing"
+
+    def main(self, mask: Tensor, direction: str, position: int):
+        results = []
+        for mask_item in mask:
+            copy = mask_item.clone()
+            h, w = mask_item.shape
+            match direction:
+                case "left":
+                    copy[:, :position] = 0
+                case "top":
+                    copy[:position, :] = 0
+                case "right":
+                    copy[:, position:] = 0
+                case "bottom":
+                    copy[position:, :] = 0
+            result = torch.clamp(copy, min=0)
                         
             results.append(result)
         try: 
@@ -1211,6 +1289,7 @@ NODE_CLASS_MAPPINGS = {
     'BBoxDetect(FaceParsing)': BBoxDetect,
     'BBoxListItemSelect(FaceParsing)': BBoxListItemSelect,
     'BBoxResize(FaceParsing)': BBoxResize,
+    'BBoxDecompose(FaceParsing)': BBoxDecompose,
 
     # 'LatentCropWithBBox(FaceParsing)': LatentCropWithBBox,
     # 'LatentInsertWithBBox(FaceParsing)': LatentInsertWithBBox,
@@ -1233,6 +1312,7 @@ NODE_CLASS_MAPPINGS = {
     # 'SkinDetectTraditional(FaceParsing)':SkinDetectTraditional,
     
     'MaskBorderDissolve(FaceParsing)':MaskBorderDissolve,
+    'MaskBlackOut(FaceParsing)': MaskBlackOut,
     'MaskCropWithBBox(FaceParsing)': MaskCropWithBBox,
     'MaskBatchComposite(FaceParsing)': MaskBatchComposite,
     'MaskListSelect(FaceParsing)': MaskListSelect,
