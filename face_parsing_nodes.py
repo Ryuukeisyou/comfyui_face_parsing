@@ -70,6 +70,15 @@ class BBoxDetect:
                     "min": -512,
                     "max": 512,
                     "step": 1
+                }),
+                "dilation_ratio": ("FLOAT", {
+                    "default": 0.2,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.01
+                }),
+                "by_ratio": ("BOOLEAN", {
+                    "default": False,
                 })
             }
         }
@@ -82,7 +91,7 @@ class BBoxDetect:
 
     CATEGORY = "face_parsing"
 
-    def main(self, bbox_detector, image: Tensor, threshold: float, dilation: int):
+    def main(self, bbox_detector, image: Tensor, threshold: float, dilation: int, dilation_ratio: float, by_ratio: bool):
         results = []
         transform = T.ToPILImage()
         for item in image:
@@ -90,10 +99,12 @@ class BBoxDetect:
             pred = bbox_detector(image_pil, conf=threshold)
             bboxes = pred[0].boxes.xyxy.cpu()
             for bbox in bboxes:
-                bbox[0] = bbox[0] - dilation
-                bbox[1] = bbox[1] - dilation
-                bbox[2] = bbox[2] + dilation
-                bbox[3] = bbox[3] + dilation
+                l, t, r, b = bbox
+                final_dilation = dilation if not by_ratio else int(max(int(b-t), int(r-l)) * dilation_ratio)
+                bbox[0] = bbox[0] - final_dilation
+                bbox[1] = bbox[1] - final_dilation
+                bbox[2] = bbox[2] + final_dilation
+                bbox[3] = bbox[3] + final_dilation
                 bbox[0] = bbox[0] if bbox[0] > 0 else 0
                 bbox[1] = bbox[1] if bbox[1] > 0 else 0
                 bbox[2] = bbox[2] if bbox[2] < item.shape[1] else item.shape[1]
