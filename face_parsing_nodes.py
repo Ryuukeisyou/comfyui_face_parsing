@@ -200,7 +200,7 @@ class BBoxDecompose:
     CATEGORY = "face_parsing"
 
     def main(self, bbox: Tensor):
-        bbox_int = bbox.int()
+        bbox_int = bbox.round().int()
         l = int(bbox_int[0])
         t = int(bbox_int[1])
         r = int(bbox_int[2])
@@ -227,7 +227,7 @@ class LatentCropWithBBox:
     CATEGORY = "face_parsing"
 
     def main(self, bbox: Tensor, samples: dict):
-        bbox_int = bbox.int() // 8
+        bbox_int = bbox.round().int() // 8
         l = int(bbox_int[0])
         t = int(bbox_int[1])
         r = int(bbox_int[2])
@@ -265,7 +265,7 @@ class LatentInsertWithBBox:
     CATEGORY = "face_parsing"
 
     def main(self, bbox: Tensor, samples_src: dict, samples: dict):
-        bbox_int = bbox.int() // 8
+        bbox_int = bbox.round().int() // 8
 
         l = int(bbox_int[0])
         t = int(bbox_int[1])
@@ -336,7 +336,7 @@ class ImageCropWithBBox:
         results = []
         image_permuted = image.permute(0, 3, 1, 2)
         for image_item in image_permuted:
-            bbox_int = bbox.int()
+            bbox_int = bbox.round().int()
             l = bbox_int[0]
             t = bbox_int[1]
             r = bbox_int[2]
@@ -374,7 +374,7 @@ class ImageCropWithBBoxList:
         image_permuted = image.permute(0, 3, 1, 2)
         for image_item in image_permuted:
             for bbox in bbox_list:
-                bbox_int = bbox.int()
+                bbox_int = bbox.round().int()
                 l = bbox_int[0]
                 t = bbox_int[1]
                 r = bbox_int[2]
@@ -411,7 +411,7 @@ class ImagePadWithBBox:
 
     def main(self, bbox: Tensor, width: int, height: int, image: Tensor):
         image_permuted = image.permute(0, 3, 1, 2)
-        bbox_int = bbox.int()
+        bbox_int = bbox.round().int()
         l = bbox_int[0]
         t = bbox_int[1]
         r = bbox_int[2]
@@ -441,7 +441,7 @@ class ImageInsertWithBBox:
     CATEGORY = "face_parsing"
 
     def main(self, bbox: Tensor, image_src: Tensor, image: Tensor):
-        bbox_int = bbox.int()
+        bbox_int = bbox.round().int()
         l = bbox_int[0]
         t = bbox_int[1]
         r = bbox_int[2]
@@ -481,7 +481,7 @@ class ImageResizeWithBBox:
     CATEGORY = "face_parsing"
 
     def main(self, bbox: Tensor, image: Tensor):
-        bbox_int = bbox.int()
+        bbox_int = bbox.round().int()
         l = int(bbox_int[0])
         t = int(bbox_int[1])
         r = int(bbox_int[2])
@@ -965,7 +965,7 @@ class MaskCropWithBBox:
         results = []
         mask_permuted = mask.permute(0, 3, 1, 2)
         for mask_item in mask_permuted:
-            bbox_int = bbox.int()
+            bbox_int = bbox.round().int()
             l = bbox_int[0]
             t = bbox_int[1]
             r = bbox_int[2]
@@ -1109,15 +1109,18 @@ class MaskToBBoxList:
     CATEGORY = "face_parsing"
 
     def main(self, mask: Tensor, pad: int):
-        result = ops.masks_to_boxes(mask)
-        if pad != 0:
+        try:
+            result = ops.masks_to_boxes(mask)
+        except:
+            result = None
+        if pad != 0 and result is not None:
             for item in result:
                 item[0] = item[0] - pad
                 item[1] = item[1] - pad
                 item[2] = item[2] + pad
                 item[3] = item[3] + pad
 
-        return ([item for item in result],)
+        return ([item for item in result] if result is not None else None,)
 
 class MaskInsertWithBBox:
     def __init__(self):
@@ -1140,7 +1143,7 @@ class MaskInsertWithBBox:
     CATEGORY = "face_parsing"
 
     def main(self, bbox: Tensor, image_src: Tensor, mask: Tensor):
-        bbox_int = bbox.int()
+        bbox_int = bbox.round().int()
         l = bbox_int[0]
         t = bbox_int[1]
         r = bbox_int[2]
