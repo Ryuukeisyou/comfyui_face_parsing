@@ -45,7 +45,7 @@ class BBoxDetectorLoader:
 
     def main(self, model_name):
         from ultralytics import YOLO
-        model_path = folder_paths.get_full_path("ultralytics", model_name)
+        model_path = folder_paths.get_full_path("ultralytics_bbox", model_name.split("/")[-1])
         model = YOLO(model_path) # type: ignore
         return (model, ) 
 
