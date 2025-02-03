@@ -35,6 +35,6 @@ a demo work flow is shown below.
 </tr>
 </table>
 
-This image contains the workflow which can be loaded into ComfyUI.
+The image bellow contains the workflow which can be loaded into ComfyUI.
 
 <img src="demo/processed.png" height="256" width="256">
