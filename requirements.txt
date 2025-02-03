@@ -1,4 +1,4 @@
-opencv-contrib-python
+opencv-contrib-python-headless
 torchvision
 ultralytics
 matplotlib
