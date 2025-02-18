@@ -893,6 +893,65 @@ class MaskBorderDissolve:
         except:
             pass
         return (results,)
+
+class MaskBorderDissolveAdvanced:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "mask": ("MASK", {}),
+                "l": ("INT", {
+                    "default": 10
+                    }),
+                "t": ("INT", {
+                    "default": 10
+                    }),
+                "r": ("INT", {
+                    "default": 10
+                    }),
+                "b": ("INT", {
+                    "default": 10
+                    }),
+                "kernel_size": ("INT", {
+                    "default": 5,
+                    }),
+                "sigma": ("FLOAT", {
+                    "default": 0,
+                    }),
+            }
+        }
+
+    RETURN_TYPES = ("MASK",)
+
+    FUNCTION = "main"
+
+    CATEGORY = "face_parsing"
+
+    def main(self, mask: Tensor, l: int, t: int, r: int, b: int, kernel_size: int, sigma: float):
+        results = []
+        if kernel_size % 2 == 0:
+            kernel_size += 1
+        for mask_item in mask:
+            white = torch.ones_like(mask_item, dtype=torch.float32)
+            if len(white.shape) == 2:
+                white = white.unsqueeze(0)
+            _, h, w = white.shape
+            white[:, t : h - 1 - b, l : w - 1 - r] = 0
+            blurred = functional.gaussian_blur(white, kernel_size=[kernel_size, kernel_size], sigma=None if sigma == 0 else [sigma, sigma])
+            result = mask_item - blurred
+            if len(mask_item.shape) == 2 and len(result.shape) == 3:
+                result = result.squeeze(0)
+            result = torch.clamp(result, min=0)
+                        
+            results.append(result)
+        try: 
+            results = torch.stack(results, dim=0)
+        except:
+            pass
+        return (results,)
     
 class MaskBlackOut:
     def __init__(self):
@@ -1326,6 +1385,7 @@ NODE_CLASS_MAPPINGS = {
     # 'SkinDetectTraditional(FaceParsing)':SkinDetectTraditional,
     
     'MaskBorderDissolve(FaceParsing)':MaskBorderDissolve,
+    'MaskBorderDissolveAdvanced(FaceParsing)':MaskBorderDissolveAdvanced,
     'MaskBlackOut(FaceParsing)': MaskBlackOut,
     'MaskCropWithBBox(FaceParsing)': MaskCropWithBBox,
     'MaskBatchComposite(FaceParsing)': MaskBatchComposite,
