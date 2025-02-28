@@ -44,10 +44,29 @@ class BBoxDetectorLoader:
     CATEGORY = "face_parsing"
 
     def main(self, model_name):
+        import torch
+        import os
         from ultralytics import YOLO
-        model_path = folder_paths.get_full_path("ultralytics_bbox", model_name.split("/")[-1])
-        model = YOLO(model_path) # type: ignore
-        return (model, ) 
+        
+        # Create a special loader function that uses weights_only=False
+        def custom_torch_load(*args, **kwargs):
+            kwargs['weights_only'] = False
+            return original_torch_load(*args, **kwargs)
+        
+        # Save original torch.load function
+        original_torch_load = torch.load
+        
+        # Replace torch.load with our custom function
+        torch.load = custom_torch_load
+        
+        try:
+            model_path = folder_paths.get_full_path("ultralytics_bbox", model_name.split("/")[-1])
+            model = YOLO(model_path)  # This will use our patched torch.load function
+        finally:
+            # Restore original torch.load function after we're done
+            torch.load = original_torch_load
+        
+        return (model, )
 
 class BBoxDetect:
     def __init__(self):
